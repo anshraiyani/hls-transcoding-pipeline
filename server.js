@@ -11,7 +11,7 @@ app.use(express.json());
 app.post('/upload', upload.single('video'), uploadVideo);
 app.get('/check-status', checkStatus);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

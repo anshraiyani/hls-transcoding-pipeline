@@ -1,0 +1,42 @@
+name: deploy backend
+
+on:
+    push:
+        branches: [main]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: checkout source
+              uses: actions/checkout@v4
+            - name: Login to dockerhub
+              run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+            - name: Build the docker image
+              run: docker build -t saulgoodman13/hls-transcoder-backend .
+            - name: Publish to dockerhub
+              run: docker push saulgoodman13/hls-transcoder-backend:latest
+
+    deploy:
+        needs: build
+        runs-on: [aws-ec2]
+        steps:
+          - name: pull image from dockerhub
+            run: docker pull saulgoodman13/hls-transcoder-backend:latest
+          - name: delete old container
+            run: docker rm -f saulgoodman13/hls-transcoder-backend
+          - name: run docker container
+            run: docker run -d -p 5000:5000 
+                --name hls-transcoder-backend-container 
+                -e PORT='${{ secrets.PORT }}'
+                -e AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
+                -e AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+                -e S3_BUCKET_NAME='${{ secrets.S3_BUCKET_NAME }}'
+                -e S3_BUCKET_NAME_PROD='${{ secrets.S3_BUCKET_NAME_PROD }}'
+                -e AWS_REGION='${{ secrets.AWS_REGION }}'
+                -e SQS_QUEUE_URL='${{ secrets.SQS_QUEUE_URL }}'
+                -e SQS_PROCESSED_QUEUE_URL='${{ secrets.SQS_PROCESSED_QUEUE_URL }}'
+                -e CLUSTER_ARN='${{ secrets.CLUSTER_ARN }}'
+                -e TASK_DEFINITION_ARN='${{ secrets.TASK_DEFINITION_ARN }}'
+                saulgoodman13/hls-transcoder-backend
+
