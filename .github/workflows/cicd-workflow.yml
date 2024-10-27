@@ -24,7 +24,7 @@ jobs:
           - name: pull image from dockerhub
             run: docker pull saulgoodman13/hls-transcoder-backend:latest
           - name: delete old container
-            run: docker rm -f saulgoodman13/hls-transcoder-backend
+            run: docker rm -f hls-transcoder-backend-container
           - name: run docker container
             run: docker run -d -p 5000:5000 
                 --name hls-transcoder-backend-container 
