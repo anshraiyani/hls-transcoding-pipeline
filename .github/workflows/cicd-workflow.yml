@@ -53,6 +53,7 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          pwd
           cd hls-transcoding-pipeline
           docker-compose --env-file .env down || true
           docker-compose --env-file .env up -d
