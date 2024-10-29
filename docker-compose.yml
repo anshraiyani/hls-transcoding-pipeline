@@ -2,22 +2,26 @@ version: '3'
 services:
   backend:
     build: ./backend
+    image: saulgoodman13/hls-transcoder-backend:latest  # Specify image name for the backend
     ports:
       - "5000:5000"
     env_file:
       - ./backend/.env
     networks:
-      - app-network  # Connects backend to custom network
+      - app-network
 
   frontend:
     build: ./frontend
+    image: saulgoodman13/hls-transcoder-frontend:latest  # Specify image name for the frontend
     ports:
-      - "80:80"
+      - "80:80"  # Change to 80 for NGINX
     depends_on:
       - backend
+    env_file:
+      - ./frontend/.env
     networks:
-      - app-network  # Connects frontend to custom network
+      - app-network
 
 networks:
   app-network:
-    driver: bridge  # Creates a custom bridge network
+    driver: bridge

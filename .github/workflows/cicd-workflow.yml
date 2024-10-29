@@ -1,59 +1,71 @@
 name: Deploy to EC2
 
 on:
-  push:
-    branches: [main]
+    push:
+        branches: [main]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout source
+              uses: actions/checkout@v4
 
-      - name: Login to DockerHub
-        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+            - name: Login to DockerHub
+              run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build the Docker images
-        run: |
-          docker build -t saulgoodman13/hls-transcoder-backend ./backend
-          docker build -t saulgoodman13/hls-transcoder-frontend ./frontend
+            - name: Build the Docker images
+              run: |
+                  docker-compose -f docker-compose.yml build
 
-      - name: Publish to DockerHub
-        run: |
-          docker push saulgoodman13/hls-transcoder-backend:latest
-          docker push saulgoodman13/hls-transcoder-frontend:latest
+            - name: Publish to DockerHub
+              run: |
+                  docker-compose -f docker-compose.yml push
 
-  deploy:
-    needs: build
-    runs-on: [aws-ec2]
-    steps:
-      - name: Pull images from DockerHub
-        run: |
-          docker pull saulgoodman13/hls-transcoder-backend:latest
-          docker pull saulgoodman13/hls-transcoder-frontend:latest
+    deploy:
+      needs: build
+      runs-on: ubuntu-latest # Use ubuntu-latest for the GitHub Actions runner
+      steps:
+          - name: SSH to EC2 and Deploy
+            uses: appleboy/scp-action@master
+            with:
+                host: ${{ secrets.EC2_HOST }}
+                username: ${{ secrets.EC2_USERNAME }}
+                key: ${{ secrets.EC2_SSH_KEY }}
+                port: 22
+                source: "docker-compose.yml"
+                target: "/home/ubuntu/app" 
 
-      - name: Delete old containers
-        run: |
-          docker rm -f hls-transcoder-backend-container || true
-          docker rm -f hls-transcoder-frontend-container || true
+          - name: SSH to EC2 and Start Application
+            uses: appleboy/ssh-action@master
+            with:
+                host: ${{ secrets.EC2_HOST }}
+                username: ${{ secrets.EC2_USERNAME }}
+                key: ${{ secrets.EC2_SSH_KEY }}
+                port: 22
+                script: |
+                    cd /home/ubuntu/app  
 
-      - name: Create .env file
-        run: |
-          echo "PORT=5000" >> .env
-          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
-          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
-          echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" >> .env
-          echo "S3_BUCKET_NAME_PROD=${{ secrets.S3_BUCKET_NAME_PROD }}" >> .env
-          echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
-          echo "SQS_QUEUE_URL=${{ secrets.SQS_QUEUE_URL }}" >> .env
-          echo "SQS_PROCESSED_QUEUE_URL=${{ secrets.SQS_PROCESSED_QUEUE_URL }}" >> .env
-          echo "CLUSTER_ARN=${{ secrets.CLUSTER_ARN }}" >> .env
-          echo "TASK_DEFINITION_ARN=${{ secrets.TASK_DEFINITION_ARN }}" >> .env
+                    # Pull the latest images
+                    docker-compose -f docker-compose.yml pull
 
-      - name: Deploy with Docker Compose
-        run: |
-          pwd
-          cd hls-transcoding-pipeline
-          docker-compose --env-file .env down || true
-          docker-compose --env-file .env up -d
+                    # Stop and remove old containers
+                    docker-compose down || true
+
+                    # Create .env file for backend
+                    echo "PORT=5000" >> backend/.env
+                    echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> backend/.env
+                    echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> backend/.env
+                    echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" >> backend/.env
+                    echo "S3_BUCKET_NAME_PROD=${{ secrets.S3_BUCKET_NAME_PROD }}" >> backend/.env
+                    echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> backend/.env
+                    echo "SQS_QUEUE_URL=${{ secrets.SQS_QUEUE_URL }}" >> backend/.env
+                    echo "SQS_PROCESSED_QUEUE_URL=${{ secrets.SQS_PROCESSED_QUEUE_URL }}" >> backend/.env
+                    echo "CLUSTER_ARN=${{ secrets.CLUSTER_ARN }}" >> backend/.env
+                    echo "TASK_DEFINITION_ARN=${{ secrets.TASK_DEFINITION_ARN }}" >> backend/.env
+
+                    # Create .env file for frontend
+                    echo "VITE_BACKEND_URL=http://13.233.102.84:5000" >> frontend/.env 
+
+                    # Start the application with the latest images
+                    docker-compose up -d

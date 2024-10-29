@@ -1,19 +1,26 @@
+# Frontend Dockerfile
 FROM node:18-alpine AS build
 
 WORKDIR /app/frontend
 
+# Copy package.json and package-lock.json (if available)
 COPY package*.json ./
 
+# Install dependencies
 RUN npm install
 
+# Copy the rest of the application code
 COPY . .
 
-RUN npm run build  # Build the Vite application
+# Build the Vite app
+RUN npm run build
 
+# Serve the app with NGINX
 FROM nginx:alpine
 
-COPY --from=build /app/frontend/dist /usr/share/nginx/html 
+# Copy the built files from the build stage
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
 
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
 
-EXPOSE 80 
+CMD ["nginx", "-g", "daemon off;"]
