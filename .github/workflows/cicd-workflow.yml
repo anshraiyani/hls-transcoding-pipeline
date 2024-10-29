@@ -26,51 +26,37 @@ jobs:
                   docker push saulgoodman13/hls-transcoder-frontend:latest
     deploy:
         needs: build
-        runs-on: [aws-ec2] # Use ubuntu-latest for the GitHub Actions runner
+        runs-on: self-hosted
         steps:
-            - name: Verify file path
-              run: ls -la
+            # Step to pull the backend image
+            - name: Pull backend image from Docker Hub
+              run: docker pull saulgoodman13/hls-transcoder-backend:latest
 
-            # - name: SSH to EC2 and Deploy
-            #   uses: appleboy/scp-action@master
-            #   with:
-            #       host: ${{ secrets.EC2_HOST }}
-            #       username: ${{ secrets.EC2_USERNAME }}
-            #       key: ${{ secrets.EC2_SSH_KEY }}
-            #       port: 22
-            #       source: "./docker-compose.yml"
-            #       target: "/home/ubuntu/app/"
+            # Step to pull the frontend image
+            - name: Pull frontend image from Docker Hub
+              run: docker pull saulgoodman13/hls-transcoder-frontend:latest
 
-            - name: SSH to EC2 and Start Application
-              uses: appleboy/ssh-action@master
-              with:
-                  host: ${{ secrets.EC2_HOST }}
-                  username: ${{ secrets.EC2_USERNAME }}
-                  key: ${{ secrets.EC2_SSH_KEY }}
-                  port: 22
-                  script: |
-                      cd /home/ubuntu/app  
+            # Step to run the backend container
+            - name: Run backend container
+              run: |
+                  docker run -d -p 5000:5000 \
+                    --name hls-transcoder-backend-container \
+                    -e PORT='5000' \
+                    -e AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}' \
+                    -e AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}' \
+                    -e S3_BUCKET_NAME='${{ secrets.S3_BUCKET_NAME }}' \
+                    -e S3_BUCKET_NAME_PROD='${{ secrets.S3_BUCKET_NAME_PROD }}' \
+                    -e AWS_REGION='${{ secrets.AWS_REGION }}' \
+                    -e SQS_QUEUE_URL='${{ secrets.SQS_QUEUE_URL }}' \
+                    -e SQS_PROCESSED_QUEUE_URL='${{ secrets.SQS_PROCESSED_QUEUE_URL }}' \
+                    -e CLUSTER_ARN='${{ secrets.CLUSTER_ARN }}' \
+                    -e TASK_DEFINITION_ARN='${{ secrets.TASK_DEFINITION_ARN }}' \
+                    saulgoodman13/hls-transcoder-backend:latest
 
-                      # Pull the latest images
-                      docker-compose -f docker-compose.yml pull
-
-                      # Stop and remove old containers
-                      docker-compose down || true
-
-                      # Create .env file for backend
-                      echo "PORT=5000" >> backend/.env
-                      echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> backend/.env
-                      echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> backend/.env
-                      echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" >> backend/.env
-                      echo "S3_BUCKET_NAME_PROD=${{ secrets.S3_BUCKET_NAME_PROD }}" >> backend/.env
-                      echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> backend/.env
-                      echo "SQS_QUEUE_URL=${{ secrets.SQS_QUEUE_URL }}" >> backend/.env
-                      echo "SQS_PROCESSED_QUEUE_URL=${{ secrets.SQS_PROCESSED_QUEUE_URL }}" >> backend/.env
-                      echo "CLUSTER_ARN=${{ secrets.CLUSTER_ARN }}" >> backend/.env
-                      echo "TASK_DEFINITION_ARN=${{ secrets.TASK_DEFINITION_ARN }}" >> backend/.env
-
-                      # Create .env file for frontend
-                      echo "VITE_BACKEND_URL=http://13.233.102.84:5000" >> frontend/.env 
-
-                      # Start the application with the latest images
-                      docker-compose up -d
+            # Step to run the frontend container
+            - name: Run frontend container
+              run: |
+                  docker run -d -p 4000:80 \
+                    --name hls-transcoder-frontend-container \
+                    -e VITE_BACKEND_URL='http://13.233.102.84:5000' \
+                    saulgoodman13/hls-transcoder-frontend:latest
