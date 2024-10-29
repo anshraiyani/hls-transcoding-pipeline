@@ -4,86 +4,78 @@ on:
     push:
         branches: [main]
 
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches:
-      - main  # Change this to your primary branch if it's different
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
+    build:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v1
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+            - name: Log in to Docker Hub
+              uses: docker/login-action@v1
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Install Docker Compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep tag_name | cut -d '"' -f 4)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version  # Verify installation
+            - name: Install Docker Compose
+              run: |
+                  sudo curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep tag_name | cut -d '"' -f 4)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+                  sudo chmod +x /usr/local/bin/docker-compose
+                  docker-compose --version  # Verify installation
 
-      - name: Build and push Docker images
-        run: |
-          docker-compose -f docker-compose.yml build
-          docker-compose -f docker-compose.yml push
+            - name: Build and push Docker images
+              run: |
+                  docker-compose -f docker-compose.yml build
+                  docker-compose -f docker-compose.yml push
 
+    deploy:
+        needs: build
+        runs-on: [aws-ec2] # Use ubuntu-latest for the GitHub Actions runner
+        steps:
+            - name: SSH to EC2 and Deploy
+              uses: appleboy/scp-action@master
+              with:
+                  host: ${{ secrets.EC2_HOST }}
+                  username: ${{ secrets.EC2_USERNAME }}
+                  key: ${{ secrets.EC2_SSH_KEY }}
+                  port: 22
+                  source: "docker-compose.yml"
+                  target: "/home/ubuntu/app"
 
-  deploy:
-    needs: build
-    runs-on: [aws-ec2] # Use ubuntu-latest for the GitHub Actions runner
-    steps:
-        - name: SSH to EC2 and Deploy
-          uses: appleboy/scp-action@master
-          with:
-              host: ${{ secrets.EC2_HOST }}
-              username: ${{ secrets.EC2_USERNAME }}
-              key: ${{ secrets.EC2_SSH_KEY }}
-              port: 22
-              source: "docker-compose.yml"
-              target: "/home/ubuntu/app" 
+            - name: SSH to EC2 and Start Application
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.EC2_HOST }}
+                  username: ${{ secrets.EC2_USERNAME }}
+                  key: ${{ secrets.EC2_SSH_KEY }}
+                  port: 22
+                  script: |
+                      cd /home/ubuntu/app  
 
-        - name: SSH to EC2 and Start Application
-          uses: appleboy/ssh-action@master
-          with:
-              host: ${{ secrets.EC2_HOST }}
-              username: ${{ secrets.EC2_USERNAME }}
-              key: ${{ secrets.EC2_SSH_KEY }}
-              port: 22
-              script: |
-                  cd /home/ubuntu/app  
+                      # Pull the latest images
+                      docker-compose -f docker-compose.yml pull
 
-                  # Pull the latest images
-                  docker-compose -f docker-compose.yml pull
+                      # Stop and remove old containers
+                      docker-compose down || true
 
-                  # Stop and remove old containers
-                  docker-compose down || true
+                      # Create .env file for backend
+                      echo "PORT=5000" >> backend/.env
+                      echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> backend/.env
+                      echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> backend/.env
+                      echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" >> backend/.env
+                      echo "S3_BUCKET_NAME_PROD=${{ secrets.S3_BUCKET_NAME_PROD }}" >> backend/.env
+                      echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> backend/.env
+                      echo "SQS_QUEUE_URL=${{ secrets.SQS_QUEUE_URL }}" >> backend/.env
+                      echo "SQS_PROCESSED_QUEUE_URL=${{ secrets.SQS_PROCESSED_QUEUE_URL }}" >> backend/.env
+                      echo "CLUSTER_ARN=${{ secrets.CLUSTER_ARN }}" >> backend/.env
+                      echo "TASK_DEFINITION_ARN=${{ secrets.TASK_DEFINITION_ARN }}" >> backend/.env
 
-                  # Create .env file for backend
-                  echo "PORT=5000" >> backend/.env
-                  echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> backend/.env
-                  echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> backend/.env
-                  echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" >> backend/.env
-                  echo "S3_BUCKET_NAME_PROD=${{ secrets.S3_BUCKET_NAME_PROD }}" >> backend/.env
-                  echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> backend/.env
-                  echo "SQS_QUEUE_URL=${{ secrets.SQS_QUEUE_URL }}" >> backend/.env
-                  echo "SQS_PROCESSED_QUEUE_URL=${{ secrets.SQS_PROCESSED_QUEUE_URL }}" >> backend/.env
-                  echo "CLUSTER_ARN=${{ secrets.CLUSTER_ARN }}" >> backend/.env
-                  echo "TASK_DEFINITION_ARN=${{ secrets.TASK_DEFINITION_ARN }}" >> backend/.env
+                      # Create .env file for frontend
+                      echo "VITE_BACKEND_URL=http://13.233.102.84:5000" >> frontend/.env 
 
-                  # Create .env file for frontend
-                  echo "VITE_BACKEND_URL=http://13.233.102.84:5000" >> frontend/.env 
-
-                  # Start the application with the latest images
-                  docker-compose up -d
+                      # Start the application with the latest images
+                      docker-compose up -d
