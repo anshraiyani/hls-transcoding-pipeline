@@ -56,7 +56,7 @@ jobs:
             # Step to run the frontend container
             - name: Run frontend container
               run: |
-                  docker run -d -p 4000:80 \
+                  docker run -d -p 80:80 \
                     --name hls-transcoder-frontend-container \
                     -e VITE_BACKEND_URL='http://13.233.102.84:5000' \
                     saulgoodman13/hls-transcoder-frontend:latest
