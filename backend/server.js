@@ -6,18 +6,18 @@ const cors = require("cors");
 const app = express();
 const upload = multer(); // Use multer's memory storage for files
 
-app.use(
-    cors({
-        origin: "*", // Allow all origins or specify your React app's URL
-        methods: ["GET", "POST", "PUT", "DELETE"], // Specify allowed methods
-        allowedHeaders: ["Content-Type", "Authorization"], // Specify allowed headers
-    })
-);
+app.use(cors());
+app.options("*", cors());
+
 app.use(express.json());
 
-// Define the route for video upload
-app.post("/upload", upload.single("video"), uploadVideo);
-app.get("/check-status", checkStatus);
+app.get("/api", (req, res) => {
+    return res.status(200).json({
+        message: "health check",
+    });
+});
+app.post("/api/upload", upload.single("video"), uploadVideo);
+app.get("/api/check-status", checkStatus);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
