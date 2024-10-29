@@ -9,10 +9,10 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - name: checkout source
+            - name: Checkout source
               uses: actions/checkout@v4
 
-            - name: Login to dockerhub
+            - name: Login to Docker Hub
               run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
 
             - name: Build backend image
@@ -24,19 +24,31 @@ jobs:
               run: |
                   docker build -t saulgoodman13/hls-transcoder-frontend:latest ./frontend
                   docker push saulgoodman13/hls-transcoder-frontend:latest
+
     deploy:
         needs: build
         runs-on: self-hosted
         steps:
-            # Step to pull the backend image
+            - name: Stop and remove existing backend container
+              run: |
+                  if [ $(docker ps -aq -f name=hls-transcoder-backend-container) ]; then
+                      docker stop hls-transcoder-backend-container || true
+                      docker rm hls-transcoder-backend-container || true
+                  fi
+
+            - name: Stop and remove existing frontend container
+              run: |
+                  if [ $(docker ps -aq -f name=hls-transcoder-frontend-container) ]; then
+                      docker stop hls-transcoder-frontend-container || true
+                      docker rm hls-transcoder-frontend-container || true
+                  fi
+
             - name: Pull backend image from Docker Hub
               run: docker pull saulgoodman13/hls-transcoder-backend:latest
 
-            # Step to pull the frontend image
             - name: Pull frontend image from Docker Hub
               run: docker pull saulgoodman13/hls-transcoder-frontend:latest
 
-            # Step to run the backend container
             - name: Run backend container
               run: |
                   docker run -d -p 5000:5000 \
@@ -53,7 +65,6 @@ jobs:
                     -e TASK_DEFINITION_ARN='${{ secrets.TASK_DEFINITION_ARN }}' \
                     saulgoodman13/hls-transcoder-backend:latest
 
-            # Step to run the frontend container
             - name: Run frontend container
               run: |
                   docker run -d -p 80:80 \
