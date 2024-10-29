@@ -35,7 +35,7 @@ jobs:
         runs-on: [aws-ec2] # Use ubuntu-latest for the GitHub Actions runner
         steps:
             - name: Verify file path
-              run: ls -la
+              run: pwd
             - name: SSH to EC2 and Deploy
               uses: appleboy/scp-action@master
               with:
