@@ -2,8 +2,7 @@ import { useState, useCallback } from "react";
 import { Upload, Check, Copy, CheckCircle } from "lucide-react";
 
 const VideoUploader = () => {
-
-    console.log(import.meta.env.VITE_BACKEND_URL)
+    console.log(import.meta.env.VITE_BACKEND_URL);
     const [file, setFile] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
     const [uploadStatus, setUploadStatus] = useState("idle");
@@ -45,13 +44,10 @@ const VideoUploader = () => {
             formData.append("video", file); // Add the file with the key 'video'
 
             // Make an API call to upload the video file using fetch
-            const response = await fetch(
-                `${import.meta.env.VITE_BACKEND_URL}/api/upload`,
-                {
-                    method: "POST",
-                    body: formData,
-                }
-            );
+            const response = await fetch(`/api/upload`, {
+                method: "POST",
+                body: formData,
+            });
 
             if (response.ok) {
                 const responseData = await response.json();
@@ -77,9 +73,7 @@ const VideoUploader = () => {
         try {
             // Make a GET request to the check-status endpoint using fetch
             const response = await fetch(
-                `${
-                    import.meta.env.VITE_BACKEND_URL
-                }/api/check-status?videoKey=${videoKey}`
+                `/api/check-status?videoKey=${videoKey}`
             );
 
             if (response.ok) {
