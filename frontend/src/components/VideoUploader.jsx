@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { Upload, Check, Copy, CheckCircle } from "lucide-react";
 
 const VideoUploader = () => {
+
+    console.log(import.meta.env.VITE_BACKEND_URL)
     const [file, setFile] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
     const [uploadStatus, setUploadStatus] = useState("idle");
