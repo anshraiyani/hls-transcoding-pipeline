@@ -91,10 +91,23 @@ const VideoUploader = () => {
 
     const copyToClipboard = useCallback(() => {
         if (hlsLink) {
-            navigator.clipboard.writeText(hlsLink).then(() => {
-                setIsCopied(true);
-                setTimeout(() => setIsCopied(false), 2000);
-            });
+            // Create a temporary textarea element
+            const tempTextarea = document.createElement("textarea");
+            tempTextarea.value = hlsLink;
+            tempTextarea.style.position = "fixed"; // Avoid affecting page layout
+            tempTextarea.style.opacity = "0"; // Invisible to the user
+            document.body.appendChild(tempTextarea);
+
+            // Select and copy the text from the textarea
+            tempTextarea.select();
+            document.execCommand("copy");
+
+            // Clean up by removing the textarea
+            document.body.removeChild(tempTextarea);
+
+            // Show feedback
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
         }
     }, [hlsLink]);
 
