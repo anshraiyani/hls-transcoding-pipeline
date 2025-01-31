@@ -114,7 +114,7 @@ const VideoUploader = () => {
     return (
         <div className="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
             <h2 className="text-2xl font-light text-gray-100 mb-6 text-center">
-                Try It Now
+                Try It Now !!
             </h2>
             <div
                 className={`border-2 border-dashed rounded-lg p-8 text-center ${
